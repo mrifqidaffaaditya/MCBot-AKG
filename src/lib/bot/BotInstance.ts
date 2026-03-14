@@ -1,6 +1,5 @@
 import mineflayer from "mineflayer";
 import { EventEmitter } from "events";
-import { parsePlayerChat } from "./chatParser";
 
 export interface BotConfig {
   sessionId: string;
@@ -105,6 +104,8 @@ export class BotInstance extends EventEmitter {
     }
   }
 
+  private recentPlayerChats = new Set<string>();
+
   private setupListeners() {
     if (!this.bot) return;
 
@@ -155,20 +156,41 @@ export class BotInstance extends EventEmitter {
       this.executeSpawnCommands();
     });
 
+    // Player chat — mineflayer already parses username
+    this.bot.on("chat", (username: string, message: string) => {
+      if (!message.trim()) return;
+      // Skip own messages
+      if (username === this.bot?.username) return;
+
+      // Track this message so 'message' event can skip it
+      const dedupeKey = `${username}:${message}`;
+      this.recentPlayerChats.add(dedupeKey);
+      setTimeout(() => this.recentPlayerChats.delete(dedupeKey), 2000);
+
+      this.emitEvent({
+        type: "chat",
+        sender: username,
+        message: message,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // All messages — used for game/system messages and auto-login detection
     this.bot.on("message", (jsonMsg) => {
       const message = jsonMsg.toString().trim();
       if (!message) return;
 
-      // Try to parse as player chat
-      const parsed = parsePlayerChat(message);
-      if (parsed) {
-        this.emitEvent({
-          type: "chat",
-          sender: parsed.username,
-          message: parsed.message,
-          timestamp: new Date().toISOString(),
-        });
-      } else {
+      // Check if this was already handled by the 'chat' event
+      let alreadyHandled = false;
+      for (const key of this.recentPlayerChats) {
+        if (message.includes(key.split(":").slice(1).join(":"))) {
+          alreadyHandled = true;
+          break;
+        }
+      }
+
+      // Only emit as GAME message if not already handled as player chat
+      if (!alreadyHandled) {
         this.emitEvent({
           type: "chat",
           sender: "GAME",
@@ -177,17 +199,17 @@ export class BotInstance extends EventEmitter {
         });
       }
 
-      // Auto Login / Register (use forceSendChat since bot might not be "online" yet in limbo)
+      // Auto Login / Register (sendChat works in any state as long as bot exists)
       if (this.config.autoLogin && this.config.loginPassword) {
         const lowerMsg = message.toLowerCase();
         if (lowerMsg.includes("/login")) {
           setTimeout(() => {
-            this.forceSendChat(`/login ${this.config.loginPassword}`);
+            this.sendChat(`/login ${this.config.loginPassword}`);
           }, 1000);
         }
         if (lowerMsg.includes("/register")) {
           setTimeout(() => {
-            this.forceSendChat(`/register ${this.config.loginPassword} ${this.config.loginPassword}`);
+            this.sendChat(`/register ${this.config.loginPassword} ${this.config.loginPassword}`);
           }, 1000);
         }
       }
@@ -279,17 +301,6 @@ export class BotInstance extends EventEmitter {
   }
 
   sendChat(message: string): boolean {
-    if (!this.bot || this.status !== "online") return false;
-    try {
-      this.bot.chat(message);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // Force send chat even when status is not "online" (needed for auto-login in limbo)
-  private forceSendChat(message: string): boolean {
     if (!this.bot) return false;
     try {
       this.bot.chat(message);

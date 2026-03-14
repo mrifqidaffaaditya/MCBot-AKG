@@ -61,7 +61,7 @@ app.prepare().then(() => {
       const mgr = getBotManager();
       if (!mgr) return;
       const bot = mgr.getBot(sessionId);
-      if (bot && bot.getStatus() === "online") {
+      if (bot) {
         bot.sendChat(message);
       }
     });

@@ -378,13 +378,13 @@ export default function BotPanelPage() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendChat()}
-                  placeholder="Ketik pesan atau command..."
-                  disabled={!isOnline}
+                  placeholder={botStatus === "offline" ? "Bot offline..." : "Ketik pesan atau command..."}
+                  disabled={botStatus === "offline"}
                 />
                 <button
                   className="btn btn-primary"
                   onClick={sendChat}
-                  disabled={!isOnline}
+                  disabled={botStatus === "offline"}
                   style={{ whiteSpace: "nowrap" }}
                 >
                   Kirim
