@@ -31,6 +31,7 @@ interface BotSessionData {
   loginPassword?: string | null;
   autoReconnect: boolean;
   webhookUrl?: string | null;
+  chatRegex?: string | null;
   status?: string;
   commands: SpawnCommand[];
 }
@@ -53,6 +54,7 @@ export default function BotPanelPage() {
   const [editForm, setEditForm] = useState({
     name: "", host: "", port: 25565, botUsername: "", version: "1.21.4",
     autoLogin: false, loginPassword: "", autoReconnect: true, webhookUrl: "",
+    chatRegex: "",
   });
   const [configSaving, setConfigSaving] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
@@ -80,6 +82,7 @@ export default function BotPanelPage() {
         loginPassword: data.loginPassword || "",
         autoReconnect: data.autoReconnect !== false,
         webhookUrl: data.webhookUrl || "",
+        chatRegex: data.chatRegex || "",
       });
     } else {
       router.push("/dashboard");
@@ -217,6 +220,7 @@ export default function BotPanelPage() {
         ...editForm,
         loginPassword: editForm.loginPassword || null,
         webhookUrl: editForm.webhookUrl || null,
+        chatRegex: editForm.chatRegex || null,
       }),
     });
     if (res.ok) {
@@ -673,6 +677,20 @@ export default function BotPanelPage() {
                 <input className="input" value={editForm.webhookUrl}
                   onChange={(e) => setEditForm({ ...editForm, webhookUrl: e.target.value })}
                   placeholder="https://..." />
+              </div>
+
+              <div className="input-group">
+                <label>Custom Chat Regex (Opsional)</label>
+                <textarea 
+                  className="input" 
+                  value={editForm.chatRegex}
+                  onChange={(e) => setEditForm({ ...editForm, chatRegex: e.target.value })}
+                  placeholder="^\[Not Secure\]\s+\S+\s+([a-zA-Z0-9_]+)\s+.*?\s+»\s+(.*)$"
+                  style={{ height: 80, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+                />
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                  Satu regex per baris. Gunakan 2 capture group: (username) dan (message).
+                </div>
               </div>
 
               <button className="btn btn-primary" onClick={saveConfig}

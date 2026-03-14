@@ -1,5 +1,6 @@
 import mineflayer from "mineflayer";
 import { EventEmitter } from "events";
+import { parsePlayerChat } from "./chatParser";
 
 export interface BotConfig {
   sessionId: string;
@@ -12,6 +13,7 @@ export interface BotConfig {
   loginPassword?: string | null;
   autoReconnect: boolean;
   webhookUrl?: string | null;
+  chatRegex?: string | null;
   spawnCommands: Array<{
     command: string;
     delayMs: number;
@@ -176,7 +178,7 @@ export class BotInstance extends EventEmitter {
     });
 
     // All messages — used for game/system messages and auto-login detection
-    this.bot.on("message", (jsonMsg) => {
+    this.bot.on("message", (jsonMsg: any) => {
       const message = jsonMsg.toString().trim();
       if (!message) return;
 
@@ -189,14 +191,30 @@ export class BotInstance extends EventEmitter {
         }
       }
 
-      // Only emit as GAME message if not already handled as player chat
+      // If not already handled natively, try our custom regex parser
       if (!alreadyHandled) {
-        this.emitEvent({
-          type: "chat",
-          sender: "GAME",
-          message,
-          timestamp: new Date().toISOString(),
-        });
+        const customRegexes = this.config.chatRegex
+          ? this.config.chatRegex.split("\n").map(r => r.trim()).filter(Boolean)
+          : [];
+        
+        const parsed = parsePlayerChat(message, customRegexes);
+        
+        if (parsed) {
+          this.emitEvent({
+            type: "chat",
+            sender: parsed.username,
+            message: parsed.message,
+            timestamp: new Date().toISOString(),
+          });
+        } else {
+          // Unrecognized format -> emit as GAME message
+          this.emitEvent({
+            type: "chat",
+            sender: "GAME",
+            message,
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
 
       // Auto Login / Register (sendChat works in any state as long as bot exists)

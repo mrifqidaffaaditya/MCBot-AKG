@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { name, host, port, botUsername, version, autoLogin, loginPassword, autoReconnect, webhookUrl } = body;
+  const { name, host, port, botUsername, version, autoLogin, loginPassword, autoReconnect, webhookUrl, chatRegex } = body;
 
   const bot = await prisma.botSession.update({
     where: { id },
@@ -47,6 +47,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       ...(loginPassword !== undefined && { loginPassword }),
       ...(autoReconnect !== undefined && { autoReconnect }),
       ...(webhookUrl !== undefined && { webhookUrl }),
+      ...(chatRegex !== undefined && { chatRegex }),
     },
     include: { commands: { orderBy: { order: "asc" } } },
   });

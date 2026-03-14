@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     loginPassword: botSession.loginPassword,
     autoReconnect: botSession.autoReconnect,
     webhookUrl: botSession.webhookUrl,
+    chatRegex: botSession.chatRegex,
     spawnCommands: botSession.commands.map((c) => ({
       command: c.command,
       delayMs: c.delayMs,
