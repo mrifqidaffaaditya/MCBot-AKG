@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id        String       @id @default(cuid())
+  username  String       @unique
+  password  String
+  role      Role         @default(USER)
+  createdAt DateTime     @default(now())
+  sessions  BotSession[]
+}
+
+model BotSession {
+  id            String         @id @default(cuid())
+  userId        String
+  name          String
+  host          String         @default("localhost")
+  port          Int            @default(25565)
+  botUsername    String         @default("Bot")
+  version       String         @default("1.21.4")
+  autoLogin     Boolean        @default(false)
+  loginPassword String?
+  autoReconnect Boolean        @default(true)
+  webhookUrl    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commands      SpawnCommand[]
+  chatLogs      ChatLog[]
+
+  @@index([userId])
+}
+
+model SpawnCommand {
+  id           String     @id @default(cuid())
+  botSessionId String
+  command      String
+  delayMs      Int        @default(1000)
+  order        Int        @default(0)
+  enabled      Boolean    @default(true)
+  botSession   BotSession @relation(fields: [botSessionId], references: [id], onDelete: Cascade)
+
+  @@index([botSessionId])
+}
+
+model ChatLog {
+  id           String     @id @default(cuid())
+  botSessionId String
+  sender       String
+  message      String     @db.Text
+  timestamp    DateTime   @default(now())
+  botSession   BotSession @relation(fields: [botSessionId], references: [id], onDelete: Cascade)
+
+  @@index([botSessionId])
+}
+
+model Settings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
