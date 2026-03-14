@@ -112,6 +112,16 @@ export class BotInstance extends EventEmitter {
       console.log(`[${this.config.name}] Socket error: ${err.message}`);
     });
 
+    // Detect login (client connected & authenticated, before spawn)
+    this.bot._client.on("login", () => {
+      this.emitEvent({
+        type: "system",
+        sender: "SYSTEM",
+        message: "Connected to server (login packet received)",
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     // Bypass Resource Pack
     this.bot._client.on("packet", (data: { uuid?: string }, meta: { name: string }) => {
       if (meta.name === "resource_pack_send" || meta.name === "add_resource_pack") {
@@ -167,17 +177,17 @@ export class BotInstance extends EventEmitter {
         });
       }
 
-      // Auto Login / Register
+      // Auto Login / Register (use forceSendChat since bot might not be "online" yet in limbo)
       if (this.config.autoLogin && this.config.loginPassword) {
         const lowerMsg = message.toLowerCase();
         if (lowerMsg.includes("/login")) {
           setTimeout(() => {
-            this.sendChat(`/login ${this.config.loginPassword}`);
+            this.forceSendChat(`/login ${this.config.loginPassword}`);
           }, 1000);
         }
         if (lowerMsg.includes("/register")) {
           setTimeout(() => {
-            this.sendChat(`/register ${this.config.loginPassword} ${this.config.loginPassword}`);
+            this.forceSendChat(`/register ${this.config.loginPassword} ${this.config.loginPassword}`);
           }, 1000);
         }
       }
@@ -270,6 +280,17 @@ export class BotInstance extends EventEmitter {
 
   sendChat(message: string): boolean {
     if (!this.bot || this.status !== "online") return false;
+    try {
+      this.bot.chat(message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Force send chat even when status is not "online" (needed for auto-login in limbo)
+  private forceSendChat(message: string): boolean {
+    if (!this.bot) return false;
     try {
       this.bot.chat(message);
       return true;

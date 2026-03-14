@@ -83,9 +83,8 @@ const globalForBotManager = globalThis as unknown as {
 export const botManager =
   globalForBotManager.botManager ?? new BotManager();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForBotManager.botManager = botManager;
-}
+// Always set globalThis so server.js can find it for Socket.IO bridging
+globalForBotManager.botManager = botManager;
 
 export { BotManager };
 export type { BotConfig, BotStatus, BotEvent };

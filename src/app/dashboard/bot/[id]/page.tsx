@@ -50,6 +50,12 @@ export default function BotPanelPage() {
   const [newCmd, setNewCmd] = useState({ command: "", delayMs: 1000 });
   const [showConfig, setShowConfig] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editForm, setEditForm] = useState({
+    name: "", host: "", port: 25565, botUsername: "", version: "1.21.4",
+    autoLogin: false, loginPassword: "", autoReconnect: true, webhookUrl: "",
+  });
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configSaved, setConfigSaved] = useState(false);
 
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -64,6 +70,17 @@ export default function BotPanelPage() {
       setBotData(data);
       setBotStatus(data.status || "offline");
       setCommands(data.commands || []);
+      setEditForm({
+        name: data.name || "",
+        host: data.host || "",
+        port: data.port || 25565,
+        botUsername: data.botUsername || "",
+        version: data.version || "1.21.4",
+        autoLogin: data.autoLogin || false,
+        loginPassword: data.loginPassword || "",
+        autoReconnect: data.autoReconnect !== false,
+        webhookUrl: data.webhookUrl || "",
+      });
     } else {
       router.push("/dashboard");
     }
@@ -188,6 +205,27 @@ export default function BotPanelPage() {
         prev.map((c) => (c.id === cmdId ? { ...c, enabled } : c))
       );
     }
+  };
+
+  const saveConfig = async () => {
+    setConfigSaving(true);
+    setConfigSaved(false);
+    const res = await fetch(`/api/bots/${botId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...editForm,
+        loginPassword: editForm.loginPassword || null,
+        webhookUrl: editForm.webhookUrl || null,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBotData({ ...botData!, ...updated });
+      setConfigSaved(true);
+      setTimeout(() => setConfigSaved(false), 2000);
+    }
+    setConfigSaving(false);
   };
 
   if (authStatus === "loading" || loading) {
@@ -566,48 +604,98 @@ export default function BotPanelPage() {
           </div>
         </div>
 
-        {/* Config sidebar */}
+        {/* Config sidebar - Editable */}
         {showConfig && (
           <div className="glass-card animate-fade-in" style={{
             padding: 20,
             height: "fit-content",
             position: "sticky",
             top: 80,
+            maxHeight: "calc(100vh - 100px)",
+            overflowY: "auto",
           }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 16 }}>
-              ⚙️ Configuration
+              ⚙️ Edit Configuration
             </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13 }}>
-              <div>
-                <span style={{ color: "var(--text-muted)" }}>Name:</span>{" "}
-                <span>{botData.name}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="input-group">
+                <label>Nama Session</label>
+                <input className="input" value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
               </div>
-              <div>
-                <span style={{ color: "var(--text-muted)" }}>Server:</span>{" "}
-                <span>{botData.host}:{botData.port}</span>
+              <div className="input-group">
+                <label>Host Server</label>
+                <input className="input" value={editForm.host}
+                  onChange={(e) => setEditForm({ ...editForm, host: e.target.value })} />
               </div>
-              <div>
-                <span style={{ color: "var(--text-muted)" }}>Username:</span>{" "}
-                <span>{botData.botUsername}</span>
+              <div className="input-group">
+                <label>Port</label>
+                <input className="input" type="number" value={editForm.port}
+                  onChange={(e) => setEditForm({ ...editForm, port: parseInt(e.target.value) || 25565 })} />
               </div>
-              <div>
-                <span style={{ color: "var(--text-muted)" }}>Version:</span>{" "}
-                <span>{botData.version}</span>
+              <div className="input-group">
+                <label>Username Bot</label>
+                <input className="input" value={editForm.botUsername}
+                  onChange={(e) => setEditForm({ ...editForm, botUsername: e.target.value })} />
               </div>
-              <div>
-                <span style={{ color: "var(--text-muted)" }}>Auto Login:</span>{" "}
-                <span>{botData.autoLogin ? "Yes" : "No"}</span>
+              <div className="input-group">
+                <label>Version</label>
+                <input className="input" value={editForm.version}
+                  onChange={(e) => setEditForm({ ...editForm, version: e.target.value })} />
               </div>
-              <div>
-                <span style={{ color: "var(--text-muted)" }}>Auto Reconnect:</span>{" "}
-                <span>{botData.autoReconnect ? "Yes" : "No"}</span>
+
+              <div style={{ display: "flex", gap: 16, padding: "4px 0" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" checked={editForm.autoLogin}
+                    onChange={(e) => setEditForm({ ...editForm, autoLogin: e.target.checked })}
+                    style={{ accentColor: "var(--primary)" }} />
+                  Auto Login
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" checked={editForm.autoReconnect}
+                    onChange={(e) => setEditForm({ ...editForm, autoReconnect: e.target.checked })}
+                    style={{ accentColor: "var(--primary)" }} />
+                  Auto Reconnect
+                </label>
               </div>
-              {botData.webhookUrl && (
-                <div>
-                  <span style={{ color: "var(--text-muted)" }}>Webhook:</span>{" "}
-                  <span style={{ wordBreak: "break-all", fontSize: 11 }}>{botData.webhookUrl}</span>
+
+              {editForm.autoLogin && (
+                <div className="input-group">
+                  <label>Login Password</label>
+                  <input className="input" type="password" value={editForm.loginPassword}
+                    onChange={(e) => setEditForm({ ...editForm, loginPassword: e.target.value })}
+                    placeholder="Password /login" />
                 </div>
               )}
+
+              <div className="input-group">
+                <label>Webhook URL</label>
+                <input className="input" value={editForm.webhookUrl}
+                  onChange={(e) => setEditForm({ ...editForm, webhookUrl: e.target.value })}
+                  placeholder="https://..." />
+              </div>
+
+              <button className="btn btn-primary" onClick={saveConfig}
+                disabled={configSaving} style={{ width: "100%", marginTop: 4 }}>
+                {configSaving ? "Menyimpan..." : "💾 Simpan Config"}
+              </button>
+
+              {configSaved && (
+                <div className="animate-fade-in" style={{
+                  padding: "8px 12px", borderRadius: "var(--radius-sm)",
+                  background: "rgba(0,230,118,0.1)", border: "1px solid rgba(0,230,118,0.3)",
+                  color: "var(--success)", fontSize: 12, textAlign: "center",
+                }}>
+                  ✅ Config tersimpan
+                </div>
+              )}
+
+              <div style={{
+                fontSize: 11, color: "var(--text-muted)", padding: "8px 0",
+                borderTop: "1px solid var(--border)", marginTop: 4,
+              }}>
+                ⚠️ Perubahan config berlaku saat bot di-restart
+              </div>
             </div>
           </div>
         )}
