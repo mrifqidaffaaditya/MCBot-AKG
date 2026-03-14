@@ -45,6 +45,25 @@ export class BotInstance extends EventEmitter {
 
   private emitEvent(event: BotEvent) {
     this.emit("botEvent", event);
+    this.dispatchWebhook(event);
+  }
+
+  private dispatchWebhook(event: BotEvent) {
+    if (!this.config.webhookUrl) return;
+
+    // Fire and forget
+    fetch(this.config.webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: this.config.sessionId,
+        botName: this.config.name,
+        botUsername: this.config.botUsername,
+        event
+      }),
+    }).catch((err) => {
+      console.error(`[${this.config.name}] Webhook error:`, err.message);
+    });
   }
 
   private emitStatus() {

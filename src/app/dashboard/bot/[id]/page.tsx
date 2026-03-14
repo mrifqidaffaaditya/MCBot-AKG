@@ -32,6 +32,7 @@ interface BotSessionData {
   autoReconnect: boolean;
   webhookUrl?: string | null;
   chatRegex?: string | null;
+  apiKey?: string | null;
   status?: string;
   commands: SpawnCommand[];
 }
@@ -54,8 +55,10 @@ export default function BotPanelPage() {
   const [editForm, setEditForm] = useState({
     name: "", host: "", port: 25565, botUsername: "", version: "1.21.4",
     autoLogin: false, loginPassword: "", autoReconnect: true, webhookUrl: "",
-    chatRegex: "",
+    chatRegex: "", apiKey: "",
   });
+  const [keyGenerating, setKeyGenerating] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [configSaving, setConfigSaving] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
 
@@ -83,6 +86,7 @@ export default function BotPanelPage() {
         autoReconnect: data.autoReconnect !== false,
         webhookUrl: data.webhookUrl || "",
         chatRegex: data.chatRegex || "",
+        apiKey: data.apiKey || "",
       });
     } else {
       router.push("/dashboard");
@@ -208,6 +212,21 @@ export default function BotPanelPage() {
         prev.map((c) => (c.id === cmdId ? { ...c, enabled } : c))
       );
     }
+  };
+
+  const regenerateApiKey = async () => {
+    if (!confirm("Yakin ingin regenerate API Key? Key lama tidak akan bisa dipakai lagi.")) return;
+    
+    setKeyGenerating(true);
+    const res = await fetch(`/api/bots/${botId}/apikey`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setEditForm(prev => ({ ...prev, apiKey: data.apiKey }));
+      setBotData(prev => prev ? { ...prev, apiKey: data.apiKey } : null);
+    } else {
+      alert("Gagal regenerate API Key.");
+    }
+    setKeyGenerating(false);
   };
 
   const saveConfig = async () => {
@@ -691,6 +710,71 @@ export default function BotPanelPage() {
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
                   Satu regex per baris. Gunakan 2 capture group: (username) dan (message).
                 </div>
+              </div>
+
+              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>🔑 API Key</label>
+                  <button 
+                    className="btn btn-ghost btn-sm" 
+                    onClick={regenerateApiKey}
+                    disabled={keyGenerating}
+                    style={{ fontSize: 12, padding: "4px 8px" }}
+                  >
+                    {keyGenerating ? "⏳" : "🔄 Regenerate"}
+                  </button>
+                </div>
+                
+                {editForm.apiKey ? (
+                  <div style={{ 
+                    display: "flex", alignItems: "center", gap: 8, 
+                    background: "var(--bg-root)", padding: "8px 12px", 
+                    borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" 
+                  }}>
+                    <code style={{ flex: 1, fontSize: 12, wordBreak: "break-all" }}>
+                      {showApiKey ? editForm.apiKey : "•".repeat(32)}
+                    </code>
+                    <button 
+                      className="btn btn-ghost btn-sm" 
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      style={{ padding: "4px 8px" }}
+                    >
+                      {showApiKey ? "🙈" : "👁️"}
+                    </button>
+                    <button 
+                      className="btn btn-ghost btn-sm" 
+                      onClick={() => {
+                        navigator.clipboard.writeText(editForm.apiKey);
+                        alert("API Key copied!");
+                      }}
+                      style={{ padding: "4px 8px" }}
+                    >
+                      📋
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    className="btn btn-primary btn-sm" 
+                    onClick={regenerateApiKey}
+                    disabled={keyGenerating}
+                    style={{ width: "100%" }}
+                  >
+                    {keyGenerating ? "Generating..." : "Generate API Key"}
+                  </button>
+                )}
+                
+                {editForm.apiKey && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)", background: "var(--bg-root)", padding: 8, borderRadius: "var(--radius-sm)" }}>
+                    <div style={{ marginBottom: 4, fontWeight: 600 }}>Contoh Penggunaan API:</div>
+                    <code style={{ display: "block", color: "var(--primary)", wordBreak: "break-all" }}>
+                      curl -X POST<br/>
+                      -H "Authorization: Bearer {editForm.apiKey.substring(0, 8)}..."<br/>
+                      -H "Content-Type: application/json"<br/>
+                      -d '{`{"message":"Hello Server!"}`}'<br/>
+                      YOUR_DOMAIN/api/bots/{botId}/chat
+                    </code>
+                  </div>
+                )}
               </div>
 
               <button className="btn btn-primary" onClick={saveConfig}

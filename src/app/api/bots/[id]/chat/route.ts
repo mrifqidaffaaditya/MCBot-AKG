@@ -6,15 +6,34 @@ import { botManager } from "@/lib/bot/BotManager";
 
 // POST /api/bots/[id]/chat - Send a chat message
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { id } = await params;
-  const botSession = await prisma.botSession.findFirst({
-    where: { id, userId: session.user.id },
-  });
+  
+  // 1. Try to authenticate via API Key (Bearer Token)
+  const authHeader = req.headers.get("authorization");
+  let botSession = null;
 
-  if (!botSession) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const apiKey = authHeader.substring(7);
+    botSession = await prisma.botSession.findFirst({
+      where: { id: id, apiKey: apiKey },
+    });
+    
+    if (!botSession) {
+      return NextResponse.json({ error: "Invalid API Key" }, { status: 401 });
+    }
+  } else {
+    // 2. Fallback to web session authentication (Dashboard)
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    botSession = await prisma.botSession.findFirst({
+      where: { id, userId: session.user.id },
+    });
+
+    if (!botSession) {
+      return NextResponse.json({ error: "Not found or not owned by user" }, { status: 404 });
+    }
+  }
 
   const body = await req.json();
   const { message } = body;
@@ -24,8 +43,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const bot = botManager.getBot(id);
-  if (!bot || bot.getStatus() !== "online") {
-    return NextResponse.json({ error: "Bot is not online" }, { status: 503 });
+  if (!bot) {
+    return NextResponse.json({ error: "Bot is offline or not running" }, { status: 503 });
   }
 
   const sent = bot.sendChat(message);
