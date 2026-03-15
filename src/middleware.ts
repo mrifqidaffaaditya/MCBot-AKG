@@ -13,6 +13,11 @@ export async function middleware(request: NextRequest) {
 
   // Check auth for dashboard and API routes
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/api/bots")) {
+    const authHeader = request.headers.get("authorization");
+    if (pathname.startsWith("/api/bots") && authHeader?.startsWith("Bearer ")) {
+      return NextResponse.next();
+    }
+
     const token = await getToken({ req: request });
     if (!token) {
       if (pathname.startsWith("/api/")) {

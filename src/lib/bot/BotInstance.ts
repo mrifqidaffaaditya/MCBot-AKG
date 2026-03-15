@@ -1,6 +1,5 @@
 import mineflayer from "mineflayer";
 import { EventEmitter } from "events";
-import { parsePlayerChat } from "./chatParser";
 
 export interface BotConfig {
   sessionId: string;
@@ -125,8 +124,6 @@ export class BotInstance extends EventEmitter {
     }
   }
 
-  private recentPlayerChats = new Set<string>();
-
   private setupListeners() {
     if (!this.bot) return;
 
@@ -177,64 +174,18 @@ export class BotInstance extends EventEmitter {
       this.executeSpawnCommands();
     });
 
-    // Player chat — mineflayer already parses username
-    this.bot.on("chat", (username: string, message: string) => {
-      if (!message.trim()) return;
-      // Skip own messages
-      if (username === this.bot?.username) return;
-
-      // Track this message so 'message' event can skip it
-      const dedupeKey = `${username}:${message}`;
-      this.recentPlayerChats.add(dedupeKey);
-      setTimeout(() => this.recentPlayerChats.delete(dedupeKey), 2000);
-
-      this.emitEvent({
-        type: "chat",
-        sender: username,
-        message: message,
-        timestamp: new Date().toISOString(),
-      });
-    });
-
-    // All messages — used for game/system messages and auto-login detection
+    // All messages — used for game/system messages, auto-login detection, and raw webhooks
     this.bot.on("message", (jsonMsg: any) => {
       const message = jsonMsg.toString().trim();
       if (!message) return;
 
-      // Check if this was already handled by the 'chat' event
-      let alreadyHandled = false;
-      for (const key of this.recentPlayerChats) {
-        if (message.includes(key.split(":").slice(1).join(":"))) {
-          alreadyHandled = true;
-          break;
-        }
-      }
-
-      // If not already handled natively, try our custom regex parser
-      if (!alreadyHandled) {
-        const customRegexes = this.config.chatRegex
-          ? this.config.chatRegex.split("\n").map(r => r.trim()).filter(Boolean)
-          : [];
-        
-        const parsed = parsePlayerChat(message, customRegexes);
-        
-        if (parsed) {
-          this.emitEvent({
-            type: "chat",
-            sender: parsed.username,
-            message: parsed.message,
-            timestamp: new Date().toISOString(),
-          });
-        } else {
-          // Unrecognized format -> emit as GAME message
-          this.emitEvent({
-            type: "chat",
-            sender: "GAME",
-            message,
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
+      // Emit the raw game message directly
+      this.emitEvent({
+        type: "chat",
+        sender: "GAME",
+        message,
+        timestamp: new Date().toISOString(),
+      });
 
       // Auto Login / Register (sendChat works in any state as long as bot exists)
       if (this.config.autoLogin && this.config.loginPassword) {
